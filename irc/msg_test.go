@@ -10,50 +10,50 @@ import (
 )
 
 func TestReadMsgOK(t *testing.T) {
-	tests := []Msg{
+	tests := []Message{
 		{
-			Raw:    ":e!foo@bar.com JOIN #test54321",
-			Origin: "e",
-			User:   "foo",
-			Host:   "bar.com",
-			Cmd:    "JOIN",
-			Args:   []string{"#test54321"},
+			Raw:       ":e!foo@bar.com JOIN #test54321",
+			Origin:    "e",
+			User:      "foo",
+			Host:      "bar.com",
+			Command:   "JOIN",
+			Arguments: []string{"#test54321"},
 		},
 		{
-			Raw:    ":e JOIN #test54321",
-			Origin: "e",
-			Cmd:    "JOIN",
-			Args:   []string{"#test54321"},
+			Raw:       ":e JOIN #test54321",
+			Origin:    "e",
+			Command:   "JOIN",
+			Arguments: []string{"#test54321"},
 		},
 		{
-			Raw:  "JOIN #test54321",
-			Cmd:  "JOIN",
-			Args: []string{"#test54321"},
+			Raw:       "JOIN #test54321",
+			Command:   "JOIN",
+			Arguments: []string{"#test54321"},
 		},
 		{
-			Raw:  "JOIN #test54321 :foo bar",
-			Cmd:  "JOIN",
-			Args: []string{"#test54321", "foo bar"},
+			Raw:       "JOIN #test54321 :foo bar",
+			Command:   "JOIN",
+			Arguments: []string{"#test54321", "foo bar"},
 		},
 		{
-			Raw:  "JOIN #test54321 ::foo bar",
-			Cmd:  "JOIN",
-			Args: []string{"#test54321", ":foo bar"},
+			Raw:       "JOIN #test54321 ::foo bar",
+			Command:   "JOIN",
+			Arguments: []string{"#test54321", ":foo bar"},
 		},
 		{
-			Raw:  "JOIN    #test54321    foo       bar   ",
-			Cmd:  "JOIN",
-			Args: []string{"#test54321", "foo", "bar"},
+			Raw:       "JOIN    #test54321    foo       bar   ",
+			Command:   "JOIN",
+			Arguments: []string{"#test54321", "foo", "bar"},
 		},
 		{
-			Raw:  "JOIN :",
-			Cmd:  "JOIN",
-			Args: []string{""},
+			Raw:       "JOIN :",
+			Command:   "JOIN",
+			Arguments: []string{""},
 		},
 	}
 
 	for _, test := range tests {
-		m, err := ParseMsg(test.Raw)
+		m, err := Parse(test.Raw)
 		if err != nil {
 			t.Errorf(err.Error())
 		}
@@ -64,7 +64,7 @@ func TestReadMsgOK(t *testing.T) {
 }
 
 func TestReadMsgDataOk(t *testing.T) {
-	max := make([]byte, MaxMsgLength)
+	max := make([]byte, MaxBytes)
 	for i := range max {
 		max[i] = 'a'
 	}
@@ -109,7 +109,7 @@ func TestReadMsgDataOk(t *testing.T) {
 }
 
 func TestReadMsgDataError(t *testing.T) {
-	tooLong := make([]byte, MaxMsgLength)
+	tooLong := make([]byte, MaxBytes)
 	for i := range tooLong {
 		tooLong[i] = 'a'
 	}
