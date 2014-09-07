@@ -294,13 +294,13 @@ func Parse(data string) (Message, error) {
 
 	if data[0] == ':' {
 		var prefix string
-		prefix, data = splitString(data[1:], ' ')
-		msg.Origin, prefix = splitString(prefix, '!')
-		msg.User, msg.Host = splitString(prefix, '@')
+		prefix, data = splitString(data[1:], " ")
+		msg.Origin, prefix = splitString(prefix, "!")
+		msg.User, msg.Host = splitString(prefix, "@")
 	}
 
 	var cmd string
-	cmd, data = splitString(data, ' ')
+	cmd, data = splitString(data, " ")
 	msg.Command = Command(cmd)
 
 	for len(data) > 0 {
@@ -308,7 +308,7 @@ func Parse(data string) (Message, error) {
 		if data[0] == ':' {
 			arg, data = data[1:], ""
 		} else {
-			arg, data = splitString(data, ' ')
+			arg, data = splitString(data, " ")
 		}
 		msg.Arguments = append(msg.Arguments, arg)
 	}
@@ -337,18 +337,13 @@ func read(in *bufio.Reader) (Message, error) {
 //
 // If the delimiter is a space ' ' then the second argument has all leading
 // space characters stripped.
-func splitString(s string, delim rune) (string, string) {
-	i := strings.IndexRune(s, delim)
-	if i < 0 {
-		return s, ""
+func splitString(s string, delim string) (head string, cons string) {
+	parts := strings.SplitN(s, delim, 2)
+	head, cons = parts[0], strings.Join(parts[1:], delim)
+	if delim == " " {
+		cons = strings.TrimLeft(cons, delim)
 	}
-	if delim != ' ' {
-		return s[:i], s[i+1:]
-	}
-	fst := s[:i]
-	for ; i < len(s) && s[i] == ' '; i++ {
-	}
-	return fst, s[i:]
+	return
 }
 
 // ReadMsgData returns the raw data for the next message from the stream.
