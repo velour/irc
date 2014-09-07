@@ -337,11 +337,11 @@ func read(in *bufio.Reader) (Message, error) {
 //
 // If the delimiter is a space ' ' then the second argument has all leading
 // space characters stripped.
-func splitString(s string, delim string) (head string, cons string) {
+func splitString(s string, delim string) (head string, tail string) {
 	parts := strings.SplitN(s, delim, 2)
-	head, cons = parts[0], strings.Join(parts[1:], delim)
+	head, tail = parts[0], strings.Join(parts[1:], delim)
 	if delim == " " {
-		cons = strings.TrimLeft(cons, delim)
+		tail = strings.TrimLeft(tail, delim)
 	}
 	return
 }
