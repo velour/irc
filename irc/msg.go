@@ -3,9 +3,7 @@ package irc
 // Parsing of IRC messages as specified in RFC 1459.
 
 import (
-	"bufio"
 	"errors"
-	"fmt"
 	"io"
 	"strings"
 )
@@ -16,18 +14,8 @@ const MaxBytes = 512
 // delimiter is the marker delineating messages in the TCP stream.
 const delimiter = "\r\n"
 
-// MsgTooLong is returned as an error when a message is received that is longer
-// than the maximum message size.
-type MsgTooLong struct {
-	// Message is the truncated message text.
-	Message string
-	// NTrunc is the number of truncated bytes.
-	NTrunc int
-}
-
-func (m MsgTooLong) Error() string {
-	return fmt.Sprintf("Message is too long (%d bytes truncated): %s", m.NTrunc, m.Message)
-}
+// ErrTooLong denotes a message that is greater than MaxBytes in size.
+var ErrTooLong = errors.New("message too long")
 
 // A Command is an IRC command as specified by RFC 2812.
 type Command string
@@ -225,9 +213,6 @@ const (
 
 // A Message is the basic unit of communication in the IRC protocol.
 type Message struct {
-	// Raw is the raw message string.
-	Raw string
-
 	// Origin is either the nick or server that originated the message.
 	Origin string
 
@@ -250,17 +235,10 @@ type Message struct {
 	Arguments []string
 }
 
-// RawString returns the raw string representation of a message.
-// If Raw is non-empty then it is returned, otherwise a raw string
-// is built from the fields of the message.  If there is an error
-// generating the raw string then the string is invalid and an
-// error is returned.
-func (m Message) RawString() (string, error) {
+// String returns the raw string representation of a message.
+// The returned string may be longer than MaxBytes.
+func (m Message) String() string {
 	raw := ""
-	if m.Raw != "" {
-		raw = m.Raw
-		goto out
-	}
 	if m.Origin != "" {
 		raw += ":" + m.Origin
 		if m.User != "" {
@@ -276,21 +254,15 @@ func (m Message) RawString() (string, error) {
 			raw += " " + a
 		}
 	}
-out:
-	if len(raw) > MaxBytes-len(delimiter) {
-		return "", MsgTooLong{raw, len(raw) - (MaxBytes - len(delimiter))}
-	}
-	return strings.TrimRight(raw, "\n"), nil
+	return strings.TrimRight(raw, "\n")
 }
 
-// Parse parses a message from a raw message string.
+// Parse parses a string into a message.
 //
 // BUG(eaburns): Doesn't validate the command.
 // BUG(eaburns): Doesn't validate that all fields are present for the
-// respective command.
 func Parse(data string) (Message, error) {
 	var msg Message
-	msg.Raw = data
 
 	if data[0] == ':' {
 		var prefix string
@@ -315,22 +287,6 @@ func Parse(data string) (Message, error) {
 	return msg, nil
 }
 
-// Read returns the next message from the stream or an error.
-func read(in *bufio.Reader) (Message, error) {
-	data, err := readMsgData(in)
-	if err != nil {
-		if long, ok := err.(MsgTooLong); ok {
-			m, err := Parse(long.Message)
-			if err != nil {
-				return Message{}, err
-			}
-			return m, long
-		}
-		return Message{}, err
-	}
-	return Parse(data)
-}
-
 // Split returns two strings, the first is the portion of the string before
 // the delimiter and the second is the portion after the delimiter. If the
 // delimiter is not in the string then the entire string is before the delimiter.
@@ -346,9 +302,17 @@ func split(s string, delim string) (head string, tail string) {
 	return
 }
 
-// ReadMsgData returns the raw data for the next message from the stream.
-// On error the returned string will be empty.
-func readMsgData(in *bufio.Reader) (string, error) {
+// Read returns the next message from the reader or an error.
+// io.EOF is returned with a zero-message if there are no more messages to read.
+func Read(in io.ByteReader) (Message, error) {
+	data, err := read(in)
+	if err != nil {
+		return Message{}, err
+	}
+	return Parse(data)
+}
+
+func read(in io.ByteReader) (string, error) {
 	var msg []byte
 	for {
 		switch c, err := in.ReadByte(); {
@@ -381,8 +345,8 @@ func readMsgData(in *bufio.Reader) (string, error) {
 			return string(msg), nil
 
 		case len(msg) >= MaxBytes-len(delimiter):
-			n, _ := junk(in)
-			return "", MsgTooLong{Message: string(msg[:len(msg)-1]), NTrunc: n + 1}
+			junk(in)
+			return "", ErrTooLong
 
 		default:
 			msg = append(msg, c)
@@ -390,9 +354,7 @@ func readMsgData(in *bufio.Reader) (string, error) {
 	}
 }
 
-// Junk reads and discards bytes until the next message marker is found,
-// returning the number of discarded non-marker bytes.
-func junk(in *bufio.Reader) (int, error) {
+func junk(in io.ByteReader) (int, error) {
 	var last byte
 	n := 0
 	for {
