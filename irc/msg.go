@@ -331,7 +331,7 @@ func read(in *bufio.Reader) (Message, error) {
 	return Parse(data)
 }
 
-// splitStrings returns two strings, the first is the portion of the string before
+// Split returns two strings, the first is the portion of the string before
 // the delimiter and the second is the portion after the delimiter. If the
 // delimiter is not in the string then the entire string is before the delimiter.
 //
