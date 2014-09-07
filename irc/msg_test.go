@@ -9,61 +9,80 @@ import (
 	"testing"
 )
 
-func TestReadMsgOK(t *testing.T) {
-	tests := []Message{
+// Tests Parse called on messages that do not contain errors.
+func TestParseOK(t *testing.T) {
+	tests := []struct {
+		raw string
+		msg Message
+	}{
 		{
-			Raw:       ":e!foo@bar.com JOIN #test54321",
-			Origin:    "e",
-			User:      "foo",
-			Host:      "bar.com",
-			Command:   "JOIN",
-			Arguments: []string{"#test54321"},
+			raw: ":e!foo@bar.com JOIN #test54321",
+			msg: Message{
+				Origin:    "e",
+				User:      "foo",
+				Host:      "bar.com",
+				Command:   "JOIN",
+				Arguments: []string{"#test54321"},
+			},
 		},
 		{
-			Raw:       ":e JOIN #test54321",
-			Origin:    "e",
-			Command:   "JOIN",
-			Arguments: []string{"#test54321"},
+			raw: ":e JOIN #test54321",
+			msg: Message{
+				Origin:    "e",
+				Command:   "JOIN",
+				Arguments: []string{"#test54321"},
+			},
 		},
 		{
-			Raw:       "JOIN #test54321",
-			Command:   "JOIN",
-			Arguments: []string{"#test54321"},
+			raw: "JOIN #test54321",
+			msg: Message{
+				Command:   "JOIN",
+				Arguments: []string{"#test54321"},
+			},
 		},
 		{
-			Raw:       "JOIN #test54321 :foo bar",
-			Command:   "JOIN",
-			Arguments: []string{"#test54321", "foo bar"},
+			raw: "JOIN #test54321 :foo bar",
+			msg: Message{
+				Command:   "JOIN",
+				Arguments: []string{"#test54321", "foo bar"},
+			},
 		},
 		{
-			Raw:       "JOIN #test54321 ::foo bar",
-			Command:   "JOIN",
-			Arguments: []string{"#test54321", ":foo bar"},
+			raw: "JOIN #test54321 ::foo bar",
+			msg: Message{
+				Command:   "JOIN",
+				Arguments: []string{"#test54321", ":foo bar"},
+			},
 		},
 		{
-			Raw:       "JOIN    #test54321    foo       bar   ",
-			Command:   "JOIN",
-			Arguments: []string{"#test54321", "foo", "bar"},
+			raw: "JOIN    #test54321    foo       bar   ",
+			msg: Message{
+				Command:   "JOIN",
+				Arguments: []string{"#test54321", "foo", "bar"},
+			},
 		},
 		{
-			Raw:       "JOIN :",
-			Command:   "JOIN",
-			Arguments: []string{""},
+			raw: "JOIN :",
+			msg: Message{
+				Command:   "JOIN",
+				Arguments: []string{""},
+			},
 		},
 	}
 
 	for _, test := range tests {
-		m, err := Parse(test.Raw)
+		m, err := Parse(test.raw)
 		if err != nil {
 			t.Errorf(err.Error())
 		}
-		if !reflect.DeepEqual(m, test) {
+		if !reflect.DeepEqual(m, test.msg) {
 			t.Errorf("failed to correctly parse %#v\nGot: %#v", test, m)
 		}
 	}
 }
 
-func TestReadMsgDataOk(t *testing.T) {
+// Tests read (the unexported version that does not call parse) on messages without errors.
+func TestReadOk(t *testing.T) {
 	max := make([]byte, MaxBytes)
 	for i := range max {
 		max[i] = 'a'
@@ -89,7 +108,7 @@ func TestReadMsgDataOk(t *testing.T) {
 		in := bufio.NewReader(strings.NewReader(test.s))
 		i := 0
 		for {
-			m, err := readMsgData(in)
+			m, err := read(in)
 			if err == io.EOF && i == len(test.ms) {
 				break
 			}
@@ -108,7 +127,8 @@ func TestReadMsgDataOk(t *testing.T) {
 	}
 }
 
-func TestReadMsgDataError(t *testing.T) {
+// Tests read (the unexported version that does not call parse) on messages with errors.
+func TestReadError(t *testing.T) {
 	tooLong := make([]byte, MaxBytes)
 	for i := range tooLong {
 		tooLong[i] = 'a'
@@ -119,15 +139,18 @@ func TestReadMsgDataError(t *testing.T) {
 		s      string
 		errStr string
 	}{
+		// EOF if there's nothing left.
+		{"", io.EOF.Error()},
+
 		{"a", "unexpected end of file in message stream"},
 		{"a\r\r\n", "unexpected carrage return in message stream"},
 		{"hello there\000\r\n", "unexpected null in message stream"},
-		{string(tooLong), "Message is too long.*"},
+		{string(tooLong), ErrTooLong.Error()},
 	}
 
 	for _, test := range tests {
 		in := bufio.NewReader(strings.NewReader(test.s))
-		_, err := readMsgData(in)
+		_, err := read(in)
 		if err == nil {
 			t.Errorf("expected error [%s], got none", test.errStr)
 		} else if matched, _ := regexp.MatchString(test.errStr, err.Error()); !matched {
