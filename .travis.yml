@@ -1,4 +1,6 @@
 language: go
+go:
+    - 1.4
 script: "./gok.sh"
 install:
     - export PATH="$HOME/gopath/bin:$PATH"
